@@ -32,6 +32,7 @@ import Status from './statusComponent.vue';
 
   /* Add these styles for centering content */
   display: flex;
+  flex-direction: column;
   justify-content: center; /* Center horizontally */
   align-items: center; /* Center vertically */
 }

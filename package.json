@@ -5,10 +5,13 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "lint": "vue-cli-service lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "core-js": "^3.8.3",
+    "mp4box": "^2.1.1",
     "pinia": "^3.0.3",
     "vue": "^3.2.13"
   },

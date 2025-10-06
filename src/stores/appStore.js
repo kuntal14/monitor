@@ -6,12 +6,16 @@ export const useAppStore = defineStore("app", () => {
     // const canvas = null; // this is where the canvas data will be stored
     const stateStatus = ref({
         videoStatus: "unloaded",
-        videoURL: "../../public/video/avc.mp4"
-
+        videoURL: "/video/avc.mp4"  // Updated path
     })
+
+    const updateStateStatus = (message) => {
+        console.log("message : ", message)
+    }
 
 
     return {
+        updateStateStatus,
         version,
         stateStatus,
     }
