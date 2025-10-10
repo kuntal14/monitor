@@ -17,22 +17,21 @@ let offscreenCanvas = null;
 
 // this button is used to call the webworker and initiate the video processing
 function handleButtonClick() {
-  if (worker){
-    worker.terminate();
+  console.log("Button clicked");
+  // Only create worker and OffscreenCanvas once
+  if (!worker) {
+    const canvas = document.querySelector("canvas");
+    offscreenCanvas = canvas.transferControlToOffscreen();
+    worker = new Worker(new URL('@/workers/decoder.js', import.meta.url));
+    worker.addEventListener("message", (message) => state.updateStateStatus(message));
+    // Send OffscreenCanvas only once
+    const dataUri = state.stateStatus.videoURL;
+    worker.postMessage({ dataUri, offscreenCanvas }, [offscreenCanvas]);
+  } else {
+    // For subsequent clicks, just send new dataUri
+    const dataUri = state.stateStatus.videoURL;
+    worker.postMessage({ dataUri });
   }
-  // get the canvas
-  // check if the canvas' control has been transferred to offscreen or not, if so then add a check to not send it again
-  if(!offscreenCanvas){
-    offscreenCanvas = document.querySelector("canvas").transferControlToOffscreen();
-  }
-
-  // initialise the worker again
-  worker = new Worker(new URL('@/workers/decoder.js', import.meta.url));
-  worker.addEventListener("message", (message) => state.updateStateStatus(message));
-
-  //get the dataURI
-  const dataUri = state.stateStatus.videoURL;
-  worker.postMessage({dataUri, offscreenCanvas}, [offscreenCanvas])
 }
 
 
