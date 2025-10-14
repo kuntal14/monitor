@@ -1,13 +1,13 @@
 <template>
   <div class="body">
     <Monitor class="monitor" />
-    <Status class="status" />
+    <!-- <Status class="status" /> -->
   </div>
 </template>
 
 <script setup>
 import Monitor from './monitorComponent.vue';
-import Status from './statusComponent.vue';
+// import Status from './statusComponent.vue';
 </script>
 
 <style scoped>
@@ -22,7 +22,7 @@ import Status from './statusComponent.vue';
 
 .monitor {
   height: 100%; /* Full height of the body */
-  width: 40%;
+  width: 100%;
   background-color: #939393;
   max-height: 100%; /* Ensure it doesn't overflow the viewport */
   max-width: 100%; /* Ensure it doesn't overflow the viewport */
