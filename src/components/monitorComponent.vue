@@ -4,16 +4,12 @@
       <h3>3D Pipeline</h3>
       <canvas class="preview_canvas" ref="previewCanvas"></canvas>
     </div>
-    
-    <div class="button">
-      <button @click="render3D">Render 3D</button>
-    </div>
-    
+
     <div class="canvas-wrapper">
       <h3>Video Output</h3>
       <canvas class="image_canvas" ref="imageCanvas"></canvas>
     </div>
-    
+
     <div class="button">
       <button @click="handleButtonClick">Show Frames</button>
     </div>
@@ -40,14 +36,35 @@ function handleButtonClick() {
   // Only create worker and OffscreenCanvas once
   if (!worker) {
     const canvas = imageCanvas.value;
-    
+
     // Set the actual canvas element dimensions to match CSS dimensions
     canvas.width = 480;  // Match the CSS width
     canvas.height = 270; // Match the updated CSS height
-    
+
     offscreenCanvas = canvas.transferControlToOffscreen();
+
+    if (!worker3D) {
+      // the worker does not exist and create one
+      const canvas3D = previewCanvas.value;
+      // set the actual canvas dimension to match the CSS dinmension
+      canvas3D.width = 270;  // Match the CSS width
+      canvas3D.height = 360; // Match the updated CSS height
+
+      offscreenCanvas3D = canvas3D.transferControlToOffscreen();
+      worker3D = new Worker(new URL('@/workers/displayFrame.js', import.meta.url));
+    }
+
     worker = new Worker(new URL('@/workers/decoder.js', import.meta.url));
-    worker.addEventListener("message", (message) => state.updateStateStatus(message));
+    worker.addEventListener("message", (message) => {
+      // call the second worker which has been initialised as soon as the button is clicked
+      // the message received is a frame, use that and the offscreen canvas to render using webgpu
+      if (message.data.frame) {
+        worker3D.postMessage({
+          frame: message.data.frame,
+          canvas: offscreenCanvas3D
+        }, [message.data.frame, offscreenCanvas3D]);
+      }
+    });
     // Send OffscreenCanvas only once
     const dataUri = state.stateStatus.videoURL;
     worker.postMessage({ dataUri, offscreenCanvas }, [offscreenCanvas]);
@@ -57,23 +74,6 @@ function handleButtonClick() {
     worker.postMessage({ dataUri });
   }
 }
-
-function render3D() {
-  if(!worker3D){
-    // the worker does not exist and create one
-    const canvas3D = previewCanvas.value;
-    // set the actual canvas dimension to match the CSS dinmension
-    canvas3D.width = 270;  // Match the CSS width
-    canvas3D.height = 360; // Match the updated CSS height
-
-    offscreenCanvas3D = canvas3D.transferControlToOffscreen();
-    worker3D = new Worker(new URL('@/workers/renderGPU.js', import.meta.url));
-    worker3D.postMessage((offscreenCanvas3D), [offscreenCanvas3D]);
-
-  }
-  console.log("Rendering 3D");
-}
-
 
 </script>
 
@@ -103,7 +103,8 @@ function render3D() {
   letter-spacing: 0.5px;
 }
 
-.preview_canvas, .image_canvas {
+.preview_canvas,
+.image_canvas {
   height: 360px;
   width: 270px;
   background-color: rgb(0, 0, 0);
@@ -120,7 +121,8 @@ function render3D() {
   width: 480px;
 }
 
-.preview_canvas:hover, .image_canvas:hover {
+.preview_canvas:hover,
+.image_canvas:hover {
   transform: scale(1.02);
 }
 
@@ -155,18 +157,18 @@ button:hover {
   .monitor-container {
     padding: 30px;
   }
-  
+
   .canvas-wrapper {
     display: block;
     width: 100%;
     margin-bottom: 25px;
   }
-  
+
   .monitor-container {
     flex-direction: column;
     align-items: center;
   }
-  
+
   .button {
     width: 100%;
   }

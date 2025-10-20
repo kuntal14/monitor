@@ -12,6 +12,8 @@ let pendingFrame = null; // the frame that is currently being processed
 // let startTime = null;
 // let frameCount = 0;
 let decoder = null;
+// let gpuWorker = null;
+let count = 0;
 // let pendingStatus = null; // this is the status that will be sent to the main thread
 
 // entry for the worker
@@ -60,10 +62,17 @@ async function start(dataURI, canvas) {
     // setting up the video decoder
     decoder = new VideoDecoder({
         async output(frame) {
-            // Introduce a delay before calling renderFrame
-            setTimeout(() => {
-                renderFrame(frame);
-            }, 0);
+            // call the displayFrame worker but only once
+            if (count === 0) {
+                self.postMessage({
+                    frame: frame,
+                }, [frame]);
+                // gpuWorker = new Worker(new URL("./displayFrame.js", import.meta.url), { type: module });
+                // gpuWorker.postMessage({ frame: frame, canvas: "dummy canvas" }, [frame]);
+                count++;
+            }
+
+            renderFrame(frame);
         },
         error(e) {
             console.error("Decoder error:", e);
@@ -262,14 +271,14 @@ class MP4Demuxer {
         //     "duration": 512
         // }
 
-        const firstKeyFrame = this.keyFrames[1];
-        const secondKeyFrame = 1800; // or the last frame
+        const firstKeyFrame = this.keyFrames[0];
+        const secondKeyFrame = this.keyFrames[9]; // or the last frame
 
         const off01 = this.sampleTable[firstKeyFrame - 1].offset; // -1 because the sample numbers are 1-based
         const off02 = this.sampleTable[secondKeyFrame - 1].offset;
         const size02 = this.sampleTable[secondKeyFrame - 1].size;
         // now get the boundingoffset
-        const boundingOffset = off02 + size02 ;
+        const boundingOffset = off02 + size02;
         // let sampleBuff = null;
         // now fetch the video but between these two offsets and then decode the frames
         fetch(this.dataURI, {
@@ -285,30 +294,30 @@ class MP4Demuxer {
                 console.log("loaded into memory, now decoding");
                 let currSample = firstKeyFrame - 1;
                 const totalSamples = secondKeyFrame - firstKeyFrame;
-                
+
                 // Process frames one by one
                 for (let i = 0; i < totalSamples; i++) {
                     if (decoder.state === "closed") {
                         console.error("Decoder has closed, stopping decoding process");
                         break;
                     }
-                    
+
                     try {
                         const sampleBlob = blob.slice(
-                            this.sampleTable[currSample+i].offset - off01,
-                            this.sampleTable[currSample+i].offset - off01 + this.sampleTable[currSample+i].size
+                            this.sampleTable[currSample + i].offset - off01,
+                            this.sampleTable[currSample + i].offset - off01 + this.sampleTable[currSample + i].size
                         );
-                        
+
                         // Use a promise to ensure sequential processing
                         await new Promise((resolve) => {
-                            this.sendToDecoder(sampleBlob, currSample+i)
+                            this.sendToDecoder(sampleBlob, currSample + i)
                                 .then(resolve)
                                 .catch(err => {
                                     console.error("Error in frame decoding:", err);
                                     resolve(); // Continue with next frame even if this one fails
-                            });
+                                });
                         });
-                        
+
                         // Optional: Add a small delay between frames to prevent overwhelming the decoder
                         // await new Promise(r => setTimeout(r, 10));
                     } catch (error) {
@@ -329,7 +338,7 @@ class MP4Demuxer {
                 duration: (1e6 * this.sampleTable[currSample].duration) / this.sampleTable[currSample].timescale,
                 data: buff,
             });
-            
+
             // Return a promise that resolves when the frame is processed
             return new Promise((resolve, reject) => {
                 try {
@@ -365,40 +374,41 @@ class Canvas2DRenderer {
         this.ctx = canvas.getContext("2d");
     }
 
-    draw(frame) {        
+    // this draws the frame onto the 2d canvas directly from the video frame
+    draw(frame) {
         // Calculate frame aspect ratio
         const frameAspect = frame.displayWidth / frame.displayHeight;
         // Calculate canvas aspect ratio
         const canvasAspect = this.canvas.width / this.canvas.height;
-        
+
         let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
-        
+
         // First clear the entire canvas with black (this creates the black background for letterboxing)
         this.ctx.fillStyle = "black";
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
+
         // Determine if we need letterboxing (black bars on top/bottom) or pillarboxing (black bars on sides)
         if (frameAspect > canvasAspect) {
             // Video is wider than canvas (relative to height) - use full width and add letterboxing
             drawWidth = this.canvas.width;
             drawHeight = this.canvas.width / frameAspect;
             offsetY = (this.canvas.height - drawHeight) / 2;
-            
+
         } else {
             // Video is taller than canvas (relative to width) - use full height and add pillarboxing
             drawHeight = this.canvas.height;
             drawWidth = this.canvas.height * frameAspect;
             offsetX = (this.canvas.width - drawWidth) / 2;
-            
+
         }
-        
+
         // Draw the frame with the calculated dimensions and position
         this.ctx.drawImage(
             frame,
             0, 0, frame.displayWidth, frame.displayHeight,  // Source rectangle
             offsetX, offsetY, drawWidth, drawHeight         // Destination rectangle
         );
-        
+
         frame.close();
     }
 }
