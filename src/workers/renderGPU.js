@@ -88,7 +88,7 @@ const Initialize = async (canvas) => {
         colorAttachments: [{
             // The texture view to render into (the canvas's back buffer)
             view: textureView,
-            // Color to clear the attachment with before rendering (purple-ish background)
+            // Color to clear the attachment with before rendering 
             clearValue: { r: 0, g: 0.0, b: 0, a: 1.0 },
             // Load operation: "clear" means clear the attachment with clearValue before drawing
             loadOp: "clear",

@@ -51,7 +51,12 @@ function handleButtonClick() {
       canvas3D.height = 360; // Match the updated CSS height
 
       offscreenCanvas3D = canvas3D.transferControlToOffscreen();
-      worker3D = new Worker(new URL('@/workers/displayFrame.js', import.meta.url));
+      worker3D = new Worker(new URL('../workers/displayFrame.js', import.meta.url));
+      worker3D.addEventListener('error', (e) => console.error('Worker3D error:', e));
+      worker3D.addEventListener('message', (e) => console.log('Worker3D message:', e));
+      worker3D.postMessage({
+        canvas: offscreenCanvas3D
+      }, [offscreenCanvas3D]);
     }
 
     worker = new Worker(new URL('@/workers/decoder.js', import.meta.url));
@@ -61,8 +66,7 @@ function handleButtonClick() {
       if (message.data.frame) {
         worker3D.postMessage({
           frame: message.data.frame,
-          canvas: offscreenCanvas3D
-        }, [message.data.frame, offscreenCanvas3D]);
+        }, [message.data.frame]);
       }
     });
     // Send OffscreenCanvas only once
