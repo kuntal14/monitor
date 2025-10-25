@@ -15,17 +15,17 @@ struct Fragment {
 }
 
 @vertex
-fn vs_main(@builtin(vertex_index) i_id: u32) -> Fragment {
+fn vs_main(@builtin(vertex_index) vertex_index: u32) -> Fragment {
     // Define quad with 6 vertices (two triangles)
     // UV coordinates for texture sampling
     var uvs = array<vec2<f32>, 6>(
-        vec2<f32>(0.0, 1.0), // Bottom-Left
-        vec2<f32>(1.0, 1.0), // Bottom-Right
-        vec2<f32>(1.0, 0.0), // Top-Right
+        vec2<f32>(0.0, 0.0), // Bottom-Left
+        vec2<f32>(1.0, 0.0), // Bottom-Right
+        vec2<f32>(1.0, 1.0), // Top-Right
         
-        vec2<f32>(0.0, 1.0), // Bottom-Left
-        vec2<f32>(1.0, 0.0), // Top-Right
-        vec2<f32>(0.0, 0.0)  // Top-Left
+        vec2<f32>(0.0, 0.0), // Bottom-Left
+        vec2<f32>(1.0, 1.0), // Top-Right
+        vec2<f32>(0.0, 1.0)  // Top-Left
     );
 
     // Normalized device coordinates (clip space)
@@ -40,21 +40,24 @@ fn vs_main(@builtin(vertex_index) i_id: u32) -> Fragment {
     );
 
     var output: Fragment;
-    output.position = camera.transform * positions[i_id];
-    output.uv = uvs[i_id];
+    output.position = camera.transform * positions[vertex_index];
+    output.uv = uvs[vertex_index];
     
     return output;
 }
 
 @fragment
 fn fs_main(input: Fragment) -> @location(0) vec4<f32> {
+    
+    let flipped_uv = vec2f(input.uv.x, 1.0 - input.uv.y);
+
     // Sample the external texture
-    // texture_external requires textureSampleBaseClampToEdge with a sampler
     let color = textureSampleBaseClampToEdge(
         frame_texture,
         frame_sampler,
-        input.uv
+        flipped_uv
     );
+    
     
     return color;
 }

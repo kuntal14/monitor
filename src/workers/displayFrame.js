@@ -1,6 +1,6 @@
 /* eslint-env worker */
 
-console.log("displayFrame worker loaded");
+// console.log("displayFrame worker loaded");
 
 let shaderCode = null;
 let canvas = null;
@@ -15,17 +15,17 @@ const IDENTITY_MATRIX = new Float32Array([
 
 async function loadShader() {
     try {
-        const uri = new URL('@/workers/frame.wgsl', import.meta.url);
-        const response = await fetch(uri);
+        const response = await fetch(new URL('./frame.wgsl', import.meta.url));
         shaderCode = await response.text();
-        console.log("Shader loaded successfully");
+        // console.log("Shader loaded successfully");
     } catch (error) {
-        console.error("Failed to load shader:", error);
+        // console.error("Failed to load shader:", error);
     }
 }
 
-async function start(canvas) {
-    console.log("starting 3d rendering");
+async function start(receivedCanvas) {
+    // console.log("Starting 3D rendering with canvas:", receivedCanvas.width, "x", receivedCanvas.height);
+    canvas = receivedCanvas;
     await loadShader();
     await Initialize(canvas);
 }
@@ -34,29 +34,38 @@ const Initialize = async (canvas) => {
     let adapter = null;
     let device = null;
 
+    // Add adapter info logging
     try {
         adapter = await navigator.gpu.requestAdapter();
     } catch (e) {
-        console.error("Failed to get GPU adapter:", e);
+        // console.error("Failed to get GPU adapter:", e);
         return;
     }
 
     try {
         device = await adapter.requestDevice();
     } catch (e) {
-        console.error("Failed to get GPU device:", e);
+        // console.error("Failed to get GPU device:", e);
         return;
     }
-
+    
     const context = canvas.getContext("webgpu");
-    const format = "bgra8unorm";
+    
+    if (!context) {
+        // console.error("🔴 Failed to get WebGPU context from canvas!");
+        return;
+    }
+    
+    
+    // Use the preferred format instead of hardcoding
+    const format = navigator.gpu.getPreferredCanvasFormat();
 
     context.configure({
         device: device,
         format: format,
     });
+    
 
-    // Bind group layout with sampler for texture_external
     const bindGroupLayout = device.createBindGroupLayout({
         entries: [
             {
@@ -75,7 +84,7 @@ const Initialize = async (canvas) => {
                 binding: 2,
                 visibility: GPUShaderStage.FRAGMENT,
                 sampler: {
-                    type: 'filtering', // Use 'filtering' for texture_external
+                    type: 'filtering',
                 }
             }
         ]
@@ -92,7 +101,6 @@ const Initialize = async (canvas) => {
 
     device.queue.writeBuffer(uniformBuffer, 0, IDENTITY_MATRIX);
 
-    // Create sampler for external texture
     const sampler = device.createSampler({
         magFilter: 'linear',
         minFilter: 'linear',
@@ -130,7 +138,6 @@ const Initialize = async (canvas) => {
         uniformBuffer,
     };
 
-    console.log("GPU Initialization complete: ready to receive frames");
 };
 
 function renderFrame(frame) {
@@ -138,16 +145,24 @@ function renderFrame(frame) {
         console.error("GPU state is not initialized.");
         return;
     }
-
+    
     const { device, context, sampler, bindGroupLayout, pipeline, uniformBuffer } = gpuState;
 
-    // Import external texture from VideoFrame
-    const texture = device.importExternalTexture({
-        source: frame,
-        colorSpace: 'srgb',
-    });
+    device.pushErrorScope('validation');
+    device.pushErrorScope('out-of-memory');
+    device.pushErrorScope('internal');
 
-    // Create bind group with sampler
+    let texture;
+    try {
+        texture = device.importExternalTexture({
+            source: frame,
+            colorSpace: 'srgb',
+        });
+    } catch (error) {
+        frame.close();
+        return;
+    }
+
     const bindGroup = device.createBindGroup({
         layout: bindGroupLayout,
         entries: [
@@ -163,7 +178,7 @@ function renderFrame(frame) {
     const renderPass = commandEncoder.beginRenderPass({
         colorAttachments: [{
             view: textureView,
-            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            clearValue: { r: 0, g: 1, b: 0, a: 1 },
             loadOp: 'clear',
             storeOp: 'store',
         }]
@@ -171,25 +186,24 @@ function renderFrame(frame) {
 
     renderPass.setPipeline(pipeline);
     renderPass.setBindGroup(0, bindGroup);
-    renderPass.draw(6, 1, 0, 0);
+    renderPass.draw(6);
     renderPass.end();
     
-    const commandBuffer = commandEncoder.finish();
-    device.queue.submit([commandBuffer]);
+    device.queue.submit([commandEncoder.finish()]);
 
     frame.close();
-    console.log("Frame rendered");
 }
 
 self.addEventListener("message", async (message) => {
-    console.log("Message received in displayFrame worker");
-
-    if (message.data.canvas && gpuState == null) {
-        canvas = message.data.canvas;
-        await start(canvas);
-    } else if (message.data.frame) {
-        renderFrame(message.data.frame);
-    } else {
-        console.log("Cannot decrypt frame or canvas, or gpuState already initialized");
+    if (message.data.canvas && !canvas) {
+        await start(message.data.canvas);
+        return;
     }
+
+    // Handle video frames
+    if (message.data.frame) {
+        renderFrame(message.data.frame);
+        return;
+    }
+    
 });

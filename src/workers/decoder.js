@@ -8,12 +8,12 @@ importScripts("/js/SampleTableProcessor.js");
 importScripts("/js/CustomMP4Reader.js");
 
 let renderer = null; // what rendering method, could be cpu (in this case), or webGPU, webGL, etc.
-let pendingFrame = null; // the frame that is currently being processed
+// let pendingFrame = null; // the frame that is currently being processed
 // let startTime = null;
 // let frameCount = 0;
 let decoder = null;
 // let gpuWorker = null;
-let count = 0;
+// let count = 0;
 // let pendingStatus = null; // this is the status that will be sent to the main thread
 
 // entry for the worker
@@ -63,16 +63,11 @@ async function start(dataURI, canvas) {
     decoder = new VideoDecoder({
         async output(frame) {
             // call the displayFrame worker but only once
-            if (count === 0) {
-                self.postMessage({
+            
+            self.postMessage({
                     frame: frame,
                 }, [frame]);
-                // gpuWorker = new Worker(new URL("./displayFrame.js", import.meta.url), { type: module });
-                // gpuWorker.postMessage({ frame: frame, canvas: "dummy canvas" }, [frame]);
-                count++;
-            }
-
-            renderFrame(frame);
+            // renderFrame(frame);s
         },
         error(e) {
             console.error("Decoder error:", e);
@@ -415,23 +410,24 @@ class Canvas2DRenderer {
 
 
 // renderer takes in the frame and draws it, this is called once per animation frame
-function renderAnimationFrame() {
-    renderer.draw(pendingFrame);
-    pendingFrame = null;
-}
+// function renderAnimationFrame() {
+//     renderer.draw(pendingFrame);
+//     pendingFrame = null;
+// }
 
 // method to call the request animation frame with the previous pending frame
-function renderFrame(frame) {
-    if (!pendingFrame) {
-        requestAnimationFrame(renderAnimationFrame);
-    } else {
-        // close the pending frame before replacing it to free up resources
-        pendingFrame.close();
-    }
+// function renderFrame(frame) {
+//     if (!pendingFrame) {
+//         console.log("rendering on canvas 0")
+//         requestAnimationFrame(renderAnimationFrame);
+//     } else {
+//         // close the pending frame before replacing it to free up resources
+//         pendingFrame.close();
+//     }
 
-    // set the new pending frame
-    pendingFrame = frame;
-}
+//     // set the new pending frame
+//     pendingFrame = frame;
+// }
 
 // Added a placeholder definition for 'setStatus' to resolve the no-undef error
 function setStatus(statusType, message) {
