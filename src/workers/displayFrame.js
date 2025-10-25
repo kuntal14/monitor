@@ -2,16 +2,58 @@
 
 // console.log("displayFrame worker loaded");
 
+// Column,Indices,Component
+// Column 0,"[0, 1, 2, 3]",X-Axis Scaling (matrix[0])
+// Column 1,"[4, 5, 6, 7]",Y-Axis Scaling (matrix[5])
+// Column 3,"[12, 13, 14, 15]",Translation
+
 let shaderCode = null;
 let canvas = null;
 let gpuState = null;
 
-const IDENTITY_MATRIX = new Float32Array([
-    1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 1.0, 0.0,
-    0.0, 0.0, 0.0, 1.0,
+const TRANSFORM_MATRIX = new Float32Array([
+    1.0, 0.0, 0.0, 0.0, // Column 0 (x-axis)
+    0.0, 1.0, 0.0, 0.0, // Column 1 (y-axis)
+    0.0, 0.0, 1.0, 0.0, // Column 2 (z-axis)
+    0.0, 0.0, 0.0, 1.0, // Column 3 (translation/w)
 ]);
+
+// a derivative of the identity matrix that will be modified to scale the frame to fit the canvas
+let matrix = new Float32Array(TRANSFORM_MATRIX);
+
+function createScaleMatrix(frameWidth, frameHeight, scaleEternal) {
+    
+    // Calculate aspect ratios
+    const canvasRatio = canvas.width / canvas.height;
+    const frameRatio = frameWidth / frameHeight;
+    
+    let scaleX = 1.0;
+    let scaleY = 1.0;
+
+    if (frameRatio > canvasRatio) {
+        // Frame is Wider (Pillarboxing): Scale Y down to fit the frame's height relative to the canvas.
+        scaleY = canvasRatio / frameRatio;
+        // Your logic was: scaleY = Rc / Rf
+    } else if (frameRatio < canvasRatio) {
+        // Frame is Taller (Letterboxing): Scale X down to fit the frame's width relative to the canvas.
+        scaleX = frameRatio / canvasRatio;
+        // Your logic was: scaleX = Rf / Rc
+    }
+    
+    // Update the matrix:
+    // Index 0: X-scale component (matrix[0][0])
+    matrix[0] = scaleX*scaleEternal;
+    // Index 5: Y-scale component (matrix[1][1])
+    matrix[5] = scaleY*scaleEternal;
+
+    // return matrix;
+}
+
+function transform(x=1, y=1, z=1) {
+    matrix[12] = x; // translation x    
+    matrix[13] = y; // translation y
+    matrix[14] = z; // translation z
+}
 
 async function loadShader() {
     try {
@@ -95,11 +137,12 @@ const Initialize = async (canvas) => {
     });
 
     const uniformBuffer = device.createBuffer({
-        size: IDENTITY_MATRIX.byteLength,
+        size: TRANSFORM_MATRIX.byteLength,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    device.queue.writeBuffer(uniformBuffer, 0, IDENTITY_MATRIX);
+    // this will be updated per frame based on the frame and canvas size -- used previously when the identity matrix wasnt changed to send as a bind variable
+    // device.queue.writeBuffer(uniformBuffer, 0, TRANSFORM_MATRIX);
 
     const sampler = device.createSampler({
         magFilter: 'linear',
@@ -153,6 +196,8 @@ function renderFrame(frame) {
     device.pushErrorScope('internal');
 
     let texture;
+
+    // load the texture from the video frame
     try {
         texture = device.importExternalTexture({
             source: frame,
@@ -162,6 +207,14 @@ function renderFrame(frame) {
         frame.close();
         return;
     }
+
+    // write the updated transform matrix to the uniform buffer
+    const scaleEternal = 0.5;
+    createScaleMatrix(frame.codedWidth, frame.codedHeight, scaleEternal);
+    transform(1, 0, 0);
+
+    // write the updated matrix to the uniform buffer
+    device.queue.writeBuffer(uniformBuffer, 0, matrix);
 
     const bindGroup = device.createBindGroup({
         layout: bindGroupLayout,
@@ -178,7 +231,7 @@ function renderFrame(frame) {
     const renderPass = commandEncoder.beginRenderPass({
         colorAttachments: [{
             view: textureView,
-            clearValue: { r: 0, g: 1, b: 0, a: 1 },
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
             loadOp: 'clear',
             storeOp: 'store',
         }]

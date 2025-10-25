@@ -266,7 +266,7 @@ class MP4Demuxer {
         //     "duration": 512
         // }
 
-        const firstKeyFrame = this.keyFrames[0];
+        const firstKeyFrame = this.keyFrames[2];
         const secondKeyFrame = this.keyFrames[9]; // or the last frame
 
         const off01 = this.sampleTable[firstKeyFrame - 1].offset; // -1 because the sample numbers are 1-based
