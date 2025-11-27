@@ -142,7 +142,7 @@ class MP4Demuxer {
     // creates the MP4File and then fetches the video data from the given URI and pipes it to the MP4FileSink
     constructor(uri, { onConfig, onChunk, setStatus }) {
         this.onConfig = onConfig;
-        this.onChunk = onChunk; // is called when the file is ready or on the onReady callback
+        this.onChunk = onChunk; 
         this.setStatus = setStatus;
         this.dataURI = uri;
 
@@ -233,9 +233,11 @@ class MP4Demuxer {
     }
 
     getKeyFrames(trak) {
-        return trak.mdia.minf.stbl.stss.sample_numbers
+        console.log("getting keyframes");
+        const keyFrames = trak.mdia.minf.stbl.stss.sample_numbers
             ? structuredClone(trak.mdia.minf.stbl.stss.sample_numbers)
             : []; // returns the deepcopy to be stored as a new file
+        return keyFrames;
     }
 
     // this will slice the video to get the first block (block here basically means the video samples between two keyframes)

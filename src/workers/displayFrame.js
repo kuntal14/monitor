@@ -211,7 +211,7 @@ function renderFrame(frame) {
     // write the updated transform matrix to the uniform buffer
     const scaleEternal = 0.5;
     createScaleMatrix(frame.codedWidth, frame.codedHeight, scaleEternal);
-    transform(1, 0, 0);
+    transform(0, 0, 0);
 
     // write the updated matrix to the uniform buffer
     device.queue.writeBuffer(uniformBuffer, 0, matrix);
